@@ -1,3 +1,5 @@
+// PicoWeather Copyright (c) 2022 MangoCats - All Rights Reserved
+// See: LICENSE file in project root for details.
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QFileDialog>
@@ -58,12 +60,25 @@ void MainWindow::writeSettings()
 void MainWindow::on_privacy_toggled( bool priv )
 { ui->privateFrame->setHidden( priv ); }
 
+/**
+ * @brief MainWindow::on_send_clicked - translates whatever is in pm
+ *   for sending to the Pi Pico W
+ */
 void MainWindow::on_send_clicked()
 { QByteArray ba = imageData();
-  ui->result->setText( QString( "Sending %1 bytes" ).arg( ba.size() ) );
-  putRequest( ba );
+  if ( ba.size() > 1000 )
+    { ui->result->setText( QString( "Sending %1 bytes" ).arg( ba.size() ) );
+      putRequest( ba );
+    }
+   else
+    { ui->result->setText( QString( "Image data too small: %1 bytes, not sending." ).arg( ba.size() ) );
+    }
 }
 
+/**
+ * @brief MainWindow::imageData
+ * @return the image on the screen, translated for the Waveshare display
+ */
 QByteArray MainWindow::imageData()
 { QByteArray ba;
   if ( pm.isNull() )
@@ -80,8 +95,13 @@ QByteArray MainWindow::imageData()
   return ba;
 }
 
+/**
+ * @brief MainWindow::pixTrans - translate the color of a single pixel
+ * @param px - standard RGB color
+ * @return 2 bytes carrying 565 format RGB tailored for easy ingestion into the Waveshare framebuffer
+ */
 QByteArray MainWindow::pixTrans( const QRgb &px )
-{ QByteArray b2; // Converting to 565 specifically for the Waveshare screen
+{ QByteArray b2;
   quint16 r = qRed( px ) >> 3;
   quint16 g = qGreen( px ) >> 2;
   quint16 b = qBlue( px ) >> 3;
@@ -91,6 +111,10 @@ QByteArray MainWindow::pixTrans( const QRgb &px )
   return b2;
 }
 
+/**
+ * @brief MainWindow::putRequest - goes to the Pi Pico W
+ * @param putData - image data to send to the screen
+ */
 void MainWindow::putRequest( const QByteArray &putData )
 {
     QUrl url = QUrl( "http://" + ui->address->text() );
@@ -100,6 +124,24 @@ void MainWindow::putRequest( const QByteArray &putData )
     mgr->put( request, putData );
 }
 
+/**
+ * @brief MainWindow::on_update_clicked - get a new weather update
+ * https://api.meteomatics.com/2022-08-22T00:00:00Z/t_2m:C/52.520551,13.461804/html
+ */
+void MainWindow::on_update_clicked()
+{   QString as = ui->username->text()+":"+ui->password->text();
+    QByteArray ba = as.toUtf8();
+    QByteArray b64 = ba.toBase64();
+    QUrl url = QUrl( "https://api.meteomatics.com/now-1H--now+6H:PT10M/t_2m:F,precip_1h:mm/" + ui->lat->text() + "," + ui->lon->text() + "/json" );
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", "Basic " + b64 );
+    mgr->get( request );
+}
+
+/**
+ * @brief MainWindow::replyFinished - both json weather forecasts and image PUT replies
+ * @param rep - pointer to the reply
+ */
 void MainWindow::replyFinished(QNetworkReply *rep)
 { ui->result->setText( "Reply:'" + QString::fromUtf8( rep->readAll() ) + "'" );
   rep->deleteLater();

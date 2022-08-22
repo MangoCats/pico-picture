@@ -1,3 +1,5 @@
+// PicoWeather Copyright (c) 2022 MangoCats - All Rights Reserved
+// See: LICENSE file in project root for details.
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -28,6 +30,7 @@ QByteArray  pixTrans( const QRgb & );
 
 public slots:
       void  on_send_clicked();
+      void  on_update_clicked();
       void  on_privacy_toggled( bool );
       void  replyFinished(QNetworkReply *);
 
