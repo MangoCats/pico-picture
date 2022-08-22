@@ -59,8 +59,12 @@ class LCD_1inch14(framebuf.FrameBuffer):
                 
             html = """<!DOCTYPE html>
             <html>
-                <head> <title>Pico W</title> </head>
-                <body> <h1>Pico W</h1> </body>
+                <head> <title>pico-picture</title> </head>
+                <body> <h1>pico-picture</h1>
+                    Do an http PUT with a body of 240x135 565 RGB values
+                    to put that image on the display.<br/>
+                    The Picture Poster application demonstrates how.
+                </body>
             </html>
             """
             
