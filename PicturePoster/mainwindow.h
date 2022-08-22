@@ -21,6 +21,7 @@ public:
            ~MainWindow();
       void  postRequest(const QByteArray &);
 QByteArray  imageData();
+QByteArray  pixTrans( const QRgb & );
 
 public slots:
       void  on_browse_clicked();

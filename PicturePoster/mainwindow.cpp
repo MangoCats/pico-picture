@@ -34,6 +34,7 @@ void MainWindow::on_browse_clicked()
       return;
     }
   ui->preview->setPixmap( pm.scaled(SCREEN_WIDTH,SCREEN_HEIGHT,Qt::KeepAspectRatio) );
+  ui->filename->setText( filename );
 }
 
 void MainWindow::on_send_clicked()
@@ -44,8 +45,29 @@ void MainWindow::on_send_clicked()
 
 QByteArray MainWindow::imageData()
 { QByteArray ba;
-  // TODO: translate pm to ba
+  if ( pm.isNull() )
+    return ba;
+  QPixmap pms = pm.scaled(SCREEN_WIDTH,SCREEN_HEIGHT,Qt::KeepAspectRatio);
+  if ( pms.isNull() )
+    return ba;
+  QImage im = pms.toImage();
+  if ( im.isNull() )
+    return ba;
+  for ( int j = 0; j < SCREEN_HEIGHT; j++ )
+    for ( int i = 0; i < SCREEN_WIDTH; i++ )
+      ba.append( pixTrans(im.pixel(i,j) ) );
   return ba;
+}
+
+QByteArray MainWindow::pixTrans( const QRgb &px )
+{ QByteArray b2; // Converting to 565 specifically for the Waveshare screen
+  quint16 r = qRed( px ) >> 3;
+  quint16 g = qGreen( px ) >> 2;
+  quint16 b = qBlue( px ) >> 3;
+  quint16 p = g | (r << 6) | (b << 11);
+  b2.append( p & 0xFF );
+  b2.append( p >> 8 );
+  return b2;
 }
 
 void MainWindow::postRequest( const QByteArray &postData )

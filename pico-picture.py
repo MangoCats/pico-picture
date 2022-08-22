@@ -70,8 +70,8 @@ class LCD_1inch14(framebuf.FrameBuffer):
 
     def handlePost( self, request, cl ):
         print(request)
-
-        self.text( "POST", 20, 50, LCD.black )
+        msg = "POST " + str( len(request) )
+        self.text( msg, 20, 50, LCD.black )
         self.show()
         cl.send('HTTP/1.0 204 No Content\r\n\r\n')
         cl.close()
@@ -228,7 +228,7 @@ if __name__=='__main__':
     key5 = Pin(18,Pin.IN,Pin.PULL_UP) #下
     key6 = Pin(20,Pin.IN,Pin.PULL_UP) #右
     
-    ssid     = 'imnot'
+    ssid     = 'ImNot'
     password = 'telling'
 
     print("WiFi connection starting")
@@ -274,7 +274,7 @@ if __name__=='__main__':
     while LCD.done == False:
         try:
             cl, addr = s.accept()
-            request = str( cl.recv(2048) )
+            request = str( cl.recv(65536) )
             
             LCD.fill_rect( 19, 39, 211, 20, LCD.white )
             LCD.text( ' '.join(map(str, addr)), 20, 40, LCD.black )
