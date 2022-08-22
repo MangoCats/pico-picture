@@ -8,7 +8,7 @@
 int main(int argc, char *argv[])
 {   QCoreApplication::setOrganizationName("MangoCats");
     QCoreApplication::setOrganizationDomain("mangocats.com");
-    QCoreApplication::setApplicationName("PicturePoster");
+    QCoreApplication::setApplicationName("PicoWeather");
     QSettings::setDefaultFormat( QSettings::IniFormat );
 
     QApplication a(argc, argv);
@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
     for (const QString &locale : uiLanguages) {
-        const QString baseName = "PicturePoster_" + QLocale(locale).name();
+        const QString baseName = "PicoWeather_" + QLocale(locale).name();
         if (translator.load(":/i18n/" + baseName)) {
             a.installTranslator(&translator);
             break;

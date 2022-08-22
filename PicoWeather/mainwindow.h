@@ -19,7 +19,7 @@ class MainWindow : public QMainWindow
 public:
             MainWindow(QWidget *parent = nullptr);
            ~MainWindow();
-      void  closeEvent(QCloseEvent *);
+      void  closeEvent(QCloseEvent *event);
       void  readSettings();
       void  writeSettings();
       void  putRequest(const QByteArray &);
@@ -27,8 +27,8 @@ QByteArray  imageData();
 QByteArray  pixTrans( const QRgb & );
 
 public slots:
-      void  on_browse_clicked();
       void  on_send_clicked();
+      void  on_privacy_toggled( bool );
       void  replyFinished(QNetworkReply *);
 
 private:

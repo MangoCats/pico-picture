@@ -13,7 +13,6 @@ MainWindow::MainWindow(QWidget *parent)
     mgr = new QNetworkAccessManager(this);
     connect(mgr, &QNetworkAccessManager::finished,
             this, &MainWindow::replyFinished );
-
 }
 
 MainWindow::~MainWindow()
@@ -34,34 +33,30 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::readSettings()
 { QSettings settings;
-       restoreGeometry( settings.value( "geometry" ).toByteArray() );
-       restoreState   ( settings.value( "state"    ).toByteArray() );
-  ui->address->setText( settings.value( "address", "" ).toString() );
+          restoreGeometry( settings.value( "geometry" ).toByteArray()  );
+          restoreState   ( settings.value( "state"    ).toByteArray()  );
+  ui->address ->setText  ( settings.value( "address" , "" ).toString() );
+  ui->lat     ->setText  ( settings.value( "lat"     , "" ).toString() );
+  ui->lon     ->setText  ( settings.value( "lon"     , "" ).toString() );
+  ui->username->setText  ( settings.value( "username", "" ).toString() );
+  ui->password->setText  ( settings.value( "password", "" ).toString() );
+  ui->privacy->setChecked( settings.value( "privacy", false ).toBool() );
 }
 
 void MainWindow::writeSettings()
 { QSettings settings;
-  settings.setValue( "address" , ui->address->text() );
-  settings.setValue( "geometry", saveGeometry()      );
-  settings.setValue( "state"   , saveState()         );
+  settings.setValue( "address" , ui->address ->text() );
+  settings.setValue( "lat"     , ui->lat     ->text() );
+  settings.setValue( "lon"     , ui->lon     ->text() );
+  settings.setValue( "username", ui->username->text() );
+  settings.setValue( "password", ui->password->text() );
+  settings.setValue( "privacy" , ui->privacy->isChecked() );
+  settings.setValue( "geometry", saveGeometry() );
+  settings.setValue( "state"   , saveState()    );
 }
 
-void MainWindow::on_browse_clicked()
-{ QFileDialog fd;
-  QString filename = fd.getOpenFileName( this, tr( "Choose Image File" ), "", tr("Image Files (*.png *.jpg *.bmp)") );
-  QFile file( filename );
-  if ( !file.open( QIODevice::ReadOnly ) )
-    { ui->preview->setText( QString( tr( "Could not open %1 for reading." ) ).arg( filename ) );
-      return;
-    }
-  file.close();
-  if ( !pm.load( filename ) )
-    { ui->preview->setText( QString( tr( "Could not load %1 as an image." ) ).arg( filename ) );
-      return;
-    }
-  ui->preview->setPixmap( pm.scaled(SCREEN_WIDTH,SCREEN_HEIGHT,Qt::KeepAspectRatio) );
-  ui->filename->setText( filename );
-}
+void MainWindow::on_privacy_toggled( bool priv )
+{ ui->privateFrame->setHidden( priv ); }
 
 void MainWindow::on_send_clicked()
 { QByteArray ba = imageData();
@@ -101,7 +96,7 @@ void MainWindow::putRequest( const QByteArray &putData )
     QUrl url = QUrl( "http://" + ui->address->text() );
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader  , "application/octet-stream" );
-    request.setHeader(QNetworkRequest::ContentLengthHeader, putData.size() );
+    request.setHeader(QNetworkRequest::ContentLengthHeader, putData.size()             );
     mgr->put( request, putData );
 }
 
