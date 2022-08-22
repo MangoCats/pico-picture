@@ -1,3 +1,5 @@
+// PicturePoster Copyright (c) 2022 MangoCats - All Rights Reserved
+// See: LICENSE file in project root for details.
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -37,4 +39,5 @@ private:
 QNetworkAccessManager *mgr;
 
 };
+
 #endif // MAINWINDOW_H

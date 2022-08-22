@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>Picture Poster</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="PicturePoster.qrc">
+    <normaloff>:/icons/frame.png</normaloff>:/icons/frame.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="2">
@@ -90,6 +94,8 @@
    </layout>
   </widget>
  </widget>
- <resources/>
+ <resources>
+  <include location="PicturePoster.qrc"/>
+ </resources>
  <connections/>
 </ui>

@@ -1,3 +1,5 @@
+// PicturePoster Copyright (c) 2022 MangoCats - All Rights Reserved
+// See: LICENSE file in project root for details.
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QFileDialog>

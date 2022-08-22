@@ -1,3 +1,5 @@
+# PicoWeather Copyright (c) 2022 MangoCats - All Rights Reserved
+# See: LICENSE file in project root for details.
 QT       += core gui network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
