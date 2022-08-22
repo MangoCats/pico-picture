@@ -43,33 +43,30 @@ class LCD_1inch14(framebuf.FrameBuffer):
         self.orange =  0x07ED
         
     def handleGet( self, request, cl ):
-        request = request[6:19]
-
-        print(request)
-
-        if 0 == request.find('/favicon.ico'):
+        if ( 6 == request.find('/favicon.ico') ):
             cl.send('HTTP/1.0 200 OK\r\nContent-type: image/x-icon\r\nContent-length: 0\r\n\r\n')
             cl.close()
         else:
-            self.text( request, 20, 50, LCD.black )
-            self.show()
-            
             if 0 == request.find('/exit'):
                 self.done = True
                 
             html = """<!DOCTYPE html>
-            <html>
-                <head> <title>pico-picture</title> </head>
+            <html> <head> <title>pico-picture</title> </head>
                 <body> <h1>pico-picture</h1>
                     Do an http PUT with a body of 240x135 565 RGB values
                     to put that image on the display.<br/>
                     The Picture Poster application demonstrates how.
+                    <hr/>{}
                 </body>
             </html>
             """
+            cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
+            cl.send( html.format( request ) )
+            cl.close()
             
-            cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\nContent-length: 0\r\n\r\n')
-            cl.send(html)
+            self.text( request[2:28], 20, 50, LCD.black )
+            self.show()
+            
 # def handleGet()
 
     def handlePut( self, request, cl ):
