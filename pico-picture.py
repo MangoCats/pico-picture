@@ -13,11 +13,13 @@ MOSI = 11
 SCK = 10
 CS = 9
 
-
-
 class LCD_1inch14(framebuf.FrameBuffer):
     def __init__(self):
         self.done = False
+        self.BLduty = 32768
+        self.pwm = PWM(Pin(BL))
+        self.pwm.freq(1000)
+        self.pwm.duty_u16(self.BLduty) #max 65535
         
         self.width = 240
         self.height = 135
@@ -42,11 +44,22 @@ class LCD_1inch14(framebuf.FrameBuffer):
         self.black  =  0x0000
         self.orange =  0x07ED
         
+    def handleBacklight( self, request ):
+        if len(request) > 21:
+            if 6 == request.find('/backlight'):
+                self.BLduty = int(request[16:21])
+                if ( self.BLduty < 0 ):
+                    self.BLduty = 0
+                if ( self.BLduty > 65535 ):
+                    self.BLduty = 65535                
+                self.pwm.duty_u16(self.BLduty)
+
     def handleGet( self, request, cl ):
         if ( 6 == request.find('/favicon.ico') ):
             cl.send('HTTP/1.0 200 OK\r\nContent-type: image/x-icon\r\nContent-length: 0\r\n\r\n')
             cl.close()
         else:
+            handleBacklight( self, request )
             if 6 == request.find('/exit'):
                 self.done = True
                 
@@ -55,7 +68,8 @@ class LCD_1inch14(framebuf.FrameBuffer):
                 <body> <h1>pico-picture</h1>
                     Do an http PUT with a body of 240x135 565 RGB values
                     to put that image on the display.<br/>
-                    The Picture Poster application demonstrates how.
+                    The <a href="https://github.com/MangoCats/pico-picture">Picture Poster</a>
+                    application demonstrates how.
                     <hr/>{}
                 </body>
             </html>
@@ -71,6 +85,7 @@ class LCD_1inch14(framebuf.FrameBuffer):
 
     def handlePut( self, request, cl ):
         print(request)
+        handleBacklight( self, request )
         msg = "PUT " + str( len(request) )
         self.text( msg, 20, 50, LCD.black )
         self.show()
@@ -215,16 +230,13 @@ if __name__=='__main__':
 
 # Select the onboard LED
     led = machine.Pin("LED", machine.Pin.OUT)
-    led.value(1)
+    led.value(1) # LED stays on until WiFi is connected
 # Set country code, opens legal WiFi channels
     country('US')
     
-    pwm = PWM(Pin(BL))
-    pwm.freq(1000)
-    pwm.duty_u16(32768)#max 65535
-
     LCD = LCD_1inch14()
-    #color BRG
+    
+#color BRG
     LCD.fill(LCD.white)
  
     LCD.show()
@@ -292,13 +304,14 @@ if __name__=='__main__':
             cl, addr = s.accept()
             request = str( cl.recv(2048) )
             
+            # Erase text lines 3 & 4
             LCD.fill_rect( 19, 39, 211, 20, LCD.white )
             LCD.text( ' '.join(map(str, addr)), 20, 40, LCD.black )
 
-            if (key3.value() == 0) and (keyA.value() == 0):
-                LCD.text( "Exit by Button Presses", 20, 50, LCD.black )
+            if (key3.value() == 0):
+                LCD.text( "Exit by Button Press", 20, 55, LCD.black )
                 LCD.done = True
-            else:
+            elif len(request) > 5:
                 if ( request[2:5] == "GET" ):
                     LCD.handleGet( request, cl )
                 elif ( request[2:5] == "PUT" ):
