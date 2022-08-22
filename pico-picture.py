@@ -73,6 +73,8 @@ class LCD_1inch14(framebuf.FrameBuffer):
 
         self.text( "POST", 20, 50, LCD.black )
         self.show()
+        cl.send('HTTP/1.0 204 No Content\r\n\r\n')
+        cl.close()
             
 # def handleGet()
 

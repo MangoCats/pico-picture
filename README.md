@@ -19,3 +19,6 @@ Software Development
 - [Official docs](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html#raspberry-pi-pico-w)
 - [micropython](https://www.cnx-software.com/2022/07/03/getting-started-with-wifi-on-raspberry-pi-pico-w-board/#wifi-with-micropython) rp2-pico-w-latest.uf2 file for Pico W
 - [flash_nuke.uf2](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html#resetting-flash-memory) file for Pico
+- code obviously adapted from the Waveshare python example for the screen 
+- and the Pico guide for http servers
+

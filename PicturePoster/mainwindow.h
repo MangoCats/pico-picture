@@ -2,6 +2,11 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QNetworkReply>
+#include <QNetworkAccessManager>
+
+#define SCREEN_WIDTH  240
+#define SCREEN_HEIGHT 135
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -12,10 +17,20 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+            MainWindow(QWidget *parent = nullptr);
+           ~MainWindow();
+      void  postRequest(const QByteArray &);
+QByteArray  imageData();
+
+public slots:
+      void  on_browse_clicked();
+      void  on_send_clicked();
+      void  replyFinished(QNetworkReply *);
 
 private:
-    Ui::MainWindow *ui;
+       Ui::MainWindow *ui;
+              QPixmap  pm;
+QNetworkAccessManager *mgr;
+
 };
 #endif // MAINWINDOW_H
