@@ -1,7 +1,7 @@
 # pico-picture
 Display system for Raspberry Pi Pico W
 
-A desktop app (PicturePoster) translates standard image files into an http: POST which
+A desktop app (PicturePoster) translates standard image files into an http: PUT which
 is received by the Pico W and displayed on the screen.
 
 This is a "gateway" project to any desktop app which might compose pictures from whatever
