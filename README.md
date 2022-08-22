@@ -8,6 +8,8 @@ This is a "gateway" project to any desktop app which might compose pictures from
 sources (weather reports, home automation, calendar schedules, etc.) and make them appear
 on the Pico screen wherever it may be (on the directly addressable network).
 
+Performance: approximately 0.3 frames per second.  Not intended for video applications.
+
 Project Bill of Materials
 
 - Raspberry Pi Pico W
