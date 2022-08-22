@@ -47,7 +47,7 @@ class LCD_1inch14(framebuf.FrameBuffer):
             cl.send('HTTP/1.0 200 OK\r\nContent-type: image/x-icon\r\nContent-length: 0\r\n\r\n')
             cl.close()
         else:
-            if 0 == request.find('/exit'):
+            if 6 == request.find('/exit'):
                 self.done = True
                 
             html = """<!DOCTYPE html>
