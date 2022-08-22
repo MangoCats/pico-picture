@@ -64,16 +64,31 @@ class LCD_1inch14(framebuf.FrameBuffer):
             </html>
             """
             
-            cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n')
+            cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\nContent-length: 0\r\n\r\n')
             cl.send(html)
 # def handleGet()
 
-    def handlePost( self, request, cl ):
+    def handlePut( self, request, cl ):
         print(request)
-        msg = "POST " + str( len(request) )
+        msg = "PUT " + str( len(request) )
         self.text( msg, 20, 50, LCD.black )
         self.show()
-        cl.send('HTTP/1.0 204 No Content\r\n\r\n')
+        body = cl.read(64800)
+        i = 1
+        y = 0
+        x = 0
+        while ( i < len(body) - 1 ):
+          c = body[i] + body[i+1] * 256
+          i += 2
+          if ( y < 135 ):
+            self.pixel( x, y, c )
+          x += 1
+          if ( x >= 240 ):
+            x = 0
+            y += 1            
+        self.show()
+              
+        cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\nContent-length: 0\r\n\r\n')
         cl.close()
             
 # def handleGet()
@@ -228,7 +243,7 @@ if __name__=='__main__':
     key5 = Pin(18,Pin.IN,Pin.PULL_UP) #下
     key6 = Pin(20,Pin.IN,Pin.PULL_UP) #右
     
-    ssid     = 'ImNot'
+    ssid     = 'Imnot'
     password = 'telling'
 
     print("WiFi connection starting")
@@ -274,7 +289,7 @@ if __name__=='__main__':
     while LCD.done == False:
         try:
             cl, addr = s.accept()
-            request = str( cl.recv(65536) )
+            request = str( cl.recv(2048) )
             
             LCD.fill_rect( 19, 39, 211, 20, LCD.white )
             LCD.text( ' '.join(map(str, addr)), 20, 40, LCD.black )
@@ -285,8 +300,8 @@ if __name__=='__main__':
             else:
                 if ( request[2:5] == "GET" ):
                     LCD.handleGet( request, cl )
-                elif ( request[2:6] == "POST" ):
-                    LCD.handlePost( request, cl )
+                elif ( request[2:5] == "PUT" ):
+                    LCD.handlePut( request, cl )
                 
             cl.close()
                     

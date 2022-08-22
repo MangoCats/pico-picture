@@ -19,7 +19,7 @@ class MainWindow : public QMainWindow
 public:
             MainWindow(QWidget *parent = nullptr);
            ~MainWindow();
-      void  postRequest(const QByteArray &);
+      void  putRequest(const QByteArray &);
 QByteArray  imageData();
 QByteArray  pixTrans( const QRgb & );
 
