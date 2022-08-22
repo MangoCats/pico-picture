@@ -27,6 +27,8 @@ public:
       void  putRequest(const QByteArray &);
 QByteArray  imageData();
 QByteArray  pixTrans( const QRgb & );
+   QString  readReply( const QByteArray & );
+      void  renderWeather();
 
 public slots:
       void  on_send_clicked();
@@ -38,6 +40,7 @@ private:
        Ui::MainWindow *ui;
               QPixmap  pm;
 QNetworkAccessManager *mgr;
-
+         QList<float> temps;
+         QList<float> rains;
 };
 #endif // MAINWINDOW_H

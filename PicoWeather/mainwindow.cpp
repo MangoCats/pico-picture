@@ -5,6 +5,10 @@
 #include <QFileDialog>
 #include <QHttpMultiPart>
 #include <QSettings>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonValue>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -132,7 +136,7 @@ void MainWindow::on_update_clicked()
 {   QString as = ui->username->text()+":"+ui->password->text();
     QByteArray ba = as.toUtf8();
     QByteArray b64 = ba.toBase64();
-    QUrl url = QUrl( "https://api.meteomatics.com/now-1H--now+6H:PT10M/t_2m:F,precip_1h:mm/" + ui->lat->text() + "," + ui->lon->text() + "/json" );
+    QUrl url = QUrl( "https://api.meteomatics.com/now-1H--now+12H:PT5M/t_2m:F,precip_1h:mm/" + ui->lat->text() + "," + ui->lon->text() + "/json" );
     QNetworkRequest request(url);
     request.setRawHeader("Authorization", "Basic " + b64 );
     mgr->get( request );
@@ -143,6 +147,122 @@ void MainWindow::on_update_clicked()
  * @param rep - pointer to the reply
  */
 void MainWindow::replyFinished(QNetworkReply *rep)
-{ ui->result->setText( "Reply:'" + QString::fromUtf8( rep->readAll() ) + "'" );
+{ QByteArray ba = rep->readAll();
+  ui->result->setText( "Reply:>>>" + readReply(ba) + "<<<" );
   rep->deleteLater();
+}
+
+/**
+ * @brief MainWindow::readReply - determine if the reply is json or not
+ *   if it is, do further analysis of the weather information and return the result code
+ *   if it is not, just return the data as a string.
+ * @param ba - reply data
+ * @return - string to be displayed, result code for json and whole array for non-json
+ */
+QString MainWindow::readReply( const QByteArray &ba )
+{ QJsonDocument jd = QJsonDocument::fromJson( ba );
+  if ( !jd.isObject() )
+    return QString::fromUtf8( ba );
+  QString status = "unknown";
+  QJsonObject jo = jd.object();
+  if ( jo.contains( "status") )
+    status = jo.value( "status" ).toString();
+  if ( !jo.contains( "data" ) )
+    status.append( " no data." );
+   else
+    { QJsonValue jvData = jo.value( "data" );
+      if ( !jvData.isArray() )
+        status.append( " data is not an array." );
+       else
+        { temps.clear();
+          rains.clear();
+          QJsonArray jaData = jvData.toArray();
+          foreach ( QJsonValue jvParam, jaData )
+            { if ( jvParam.isObject() )
+                { QJsonObject joParam = jvParam.toObject();
+                  if ( joParam.contains( "parameter" ) )
+                    { QString pv = joParam.value( "parameter" ).toString();
+                      if ( pv == "t_2m:F" ) // Temperature values
+                        { if ( joParam.contains( "coordinates" ) )
+                            { QJsonValue jvCoord = joParam.value( "coordinates" );
+                              if ( jvCoord.isArray() )
+                                { QJsonArray jaCoord = jvCoord.toArray();
+                                  if ( jaCoord.size() >= 1 )
+                                    { QJsonValue jvC1 = jaCoord.at(0);
+                                      if ( jvC1.isObject() )
+                                        { QJsonObject joC1 = jvC1.toObject();
+                                          if ( joC1.contains( "dates" ) )
+                                            { QJsonValue jvDates = joC1.value( "dates" );
+                                              if ( jvDates.isArray() )
+                                                { QJsonArray jaDates = jvDates.toArray();
+                                                  foreach ( QJsonValue date, jaDates )
+                                                    { if ( date.isObject() )
+                                                        { QJsonObject joDate = date.toObject();
+                                                          if ( joDate.contains( "value" ) )
+                                                            { QJsonValue jvValue = joDate.value( "value" );
+                                                              if ( jvValue.isDouble() )
+                                                                temps.append( jvValue.toDouble() );
+                                                            } // date contains value
+                                                        } // date is Object
+                                                    } // iterate dates
+                                                } // dates is array
+                                            } // coordinate[0] contains dates
+                                        } // coordinate[0] is Object
+                                    } // coordinates size >= 1
+                                } // coordinates is array
+                            } // contains coordinates
+                        } // Temperature values
+                       else if ( pv == "precip_1h:mm" ) // Rainfall accumulations
+                        { if ( joParam.contains( "coordinates" ) )
+                            { QJsonValue jvCoord = joParam.value( "coordinates" );
+                              if ( jvCoord.isArray() )
+                                { QJsonArray jaCoord = jvCoord.toArray();
+                                  if ( jaCoord.size() >= 1 )
+                                    { QJsonValue jvC1 = jaCoord.at(0);
+                                      if ( jvC1.isObject() )
+                                        { QJsonObject joC1 = jvC1.toObject();
+                                          if ( joC1.contains( "dates" ) )
+                                            { QJsonValue jvDates = joC1.value( "dates" );
+                                              if ( jvDates.isArray() )
+                                                { QJsonArray jaDates = jvDates.toArray();
+                                                  foreach ( QJsonValue date, jaDates )
+                                                    { if ( date.isObject() )
+                                                        { QJsonObject joDate = date.toObject();
+                                                          if ( joDate.contains( "value" ) )
+                                                            { QJsonValue jvValue = joDate.value( "value" );
+                                                              if ( jvValue.isDouble() )
+                                                                rains.append( jvValue.toDouble() );
+                                                            } // date contains value
+                                                        } // date is Object
+                                                    } // iterate dates
+                                                } // dates is array
+                                            } // coordinate[0] contains dates
+                                        } // coordinate[0] is Object
+                                    } // coordinates size >= 1
+                                } // coordinates is array
+                            } // contains coordinates
+                        } // Rainfall accumulations
+                    } // object contains parameter
+                } // is object
+            } // each parameter array item
+          if ( temps.size() > 0 )
+            renderWeather();
+           else
+            status.append( " no temp data" );
+        } // data is not an array
+    } // no data
+  return status;
+}
+
+/**
+ * @brief MainWindow::renderWeather - temps and or rains have updated
+ *   draw the new weather image and send it to the display
+ */
+void MainWindow::renderWeather()
+{ QString temp;
+  foreach ( float t, temps )
+    temp.append( QString( "%1F " ).arg( t ) );
+  foreach ( float mm, rains )
+    temp.append( QString( "%1in " ).arg( mm/25.4, 4, 'g', 2 ) );
+  ui->preview->setText( temp );
 }
