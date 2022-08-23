@@ -273,7 +273,7 @@ void MainWindow::renderWeather()
   float maxTemp = -100.0;
   float maxRain =    0.0;
   int n = 0;
-  int nowI = 13;
+  int nowI = 13; // 1 hour, 5 minute intervals...
   foreach ( float t, temps )
     { if ( t < minTemp ) minTemp = t;
       if ( t > maxTemp ) maxTemp = t;
@@ -344,7 +344,7 @@ void MainWindow::renderWeather()
           // Temp line
           int tempY = (int)(((float)h)*(tTemp - minTemp)/tempRng);
           p.setPen(QPen(QColor(255, 127, 0), 6, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
-          p.drawLine( x0, lTempY, x1, tempY );
+          p.drawLine( x0, h - 1 - lTempY, x1, h - 1 - tempY );
           lTempY = tempY;
           x0 = x1;
         }
