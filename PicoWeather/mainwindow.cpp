@@ -333,6 +333,7 @@ void MainWindow::renderWeather()
               for ( int xi = x0; xi < x1; xi++ )
                 p.drawLine( xi, h-1, xi, h-20-yRain );
             }
+          x0 = x1;
         }
 
       // Temperature numerics
