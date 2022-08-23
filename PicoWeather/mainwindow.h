@@ -6,6 +6,7 @@
 #include <QMainWindow>
 #include <QNetworkReply>
 #include <QNetworkAccessManager>
+#include <QTimer>
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 135
@@ -34,11 +35,13 @@ public slots:
       void  on_send_clicked();
       void  on_update_clicked();
       void  on_privacy_toggled( bool );
+      void  on_interval_valueChanged( int );
       void  replyFinished(QNetworkReply *);
 
 private:
        Ui::MainWindow *ui;
               QPixmap  pm;
+               QTimer  autoUpdate;
 QNetworkAccessManager *mgr;
          QList<float> temps;
          QList<float> rains;

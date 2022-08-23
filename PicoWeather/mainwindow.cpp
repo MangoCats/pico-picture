@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QPainter>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,6 +20,10 @@ MainWindow::MainWindow(QWidget *parent)
     mgr = new QNetworkAccessManager(this);
     connect(mgr, &QNetworkAccessManager::finished,
             this, &MainWindow::replyFinished );
+
+    connect(&autoUpdate,SIGNAL(timeout()),SLOT(on_update_clicked()));
+    autoUpdate.setSingleShot( false );
+    autoUpdate.start( ui->interval->value() * 60000 );
 }
 
 MainWindow::~MainWindow()
@@ -44,6 +49,7 @@ void MainWindow::readSettings()
   ui->address ->setText  ( settings.value( "address" , "" ).toString() );
   ui->lat     ->setText  ( settings.value( "lat"     , "" ).toString() );
   ui->lon     ->setText  ( settings.value( "lon"     , "" ).toString() );
+  ui->interval->setValue ( settings.value( "interval", 5  ).toInt()    );
   ui->username->setText  ( settings.value( "username", "" ).toString() );
   ui->password->setText  ( settings.value( "password", "" ).toString() );
   ui->privacy->setChecked( settings.value( "privacy", false ).toBool() );
@@ -51,11 +57,12 @@ void MainWindow::readSettings()
 
 void MainWindow::writeSettings()
 { QSettings settings;
-  settings.setValue( "address" , ui->address ->text() );
-  settings.setValue( "lat"     , ui->lat     ->text() );
-  settings.setValue( "lon"     , ui->lon     ->text() );
-  settings.setValue( "username", ui->username->text() );
-  settings.setValue( "password", ui->password->text() );
+  settings.setValue( "address" , ui->address ->text()  );
+  settings.setValue( "lat"     , ui->lat     ->text()  );
+  settings.setValue( "lon"     , ui->lon     ->text()  );
+  settings.setValue( "interval", ui->interval->value() );
+  settings.setValue( "username", ui->username->text()  );
+  settings.setValue( "password", ui->password->text()  );
   settings.setValue( "privacy" , ui->privacy->isChecked() );
   settings.setValue( "geometry", saveGeometry() );
   settings.setValue( "state"   , saveState()    );
@@ -63,6 +70,9 @@ void MainWindow::writeSettings()
 
 void MainWindow::on_privacy_toggled( bool priv )
 { ui->privateFrame->setHidden( priv ); }
+
+void MainWindow::on_interval_valueChanged( int i )
+{ autoUpdate.setInterval( i * 60000 ); }
 
 /**
  * @brief MainWindow::on_send_clicked - translates whatever is in pm
@@ -148,7 +158,7 @@ void MainWindow::on_update_clicked()
  */
 void MainWindow::replyFinished(QNetworkReply *rep)
 { QByteArray ba = rep->readAll();
-  ui->result->setText( "Reply:>>>" + readReply(ba) + "<<<" );
+  ui->result->setText( "Reply:'" + readReply(ba) + "'" );
   rep->deleteLater();
 }
 
@@ -259,10 +269,89 @@ QString MainWindow::readReply( const QByteArray &ba )
  *   draw the new weather image and send it to the display
  */
 void MainWindow::renderWeather()
-{ QString temp;
+{ float minTemp =  100.0;
+  float maxTemp = -100.0;
+  float maxRain =    0.0;
+  int n = 0;
+  int nowI = 13;
   foreach ( float t, temps )
-    temp.append( QString( "%1F " ).arg( t ) );
+    { if ( t < minTemp ) minTemp = t;
+      if ( t > maxTemp ) maxTemp = t;
+      n++;
+    }
+  if ( n < 1 )
+    return;
+  if ( nowI >= n )
+    nowI = n-1;
+
   foreach ( float mm, rains )
-    temp.append( QString( "%1in " ).arg( mm/25.4, 4, 'g', 2 ) );
-  ui->preview->setText( temp );
+    if ( mm > maxRain )
+      maxRain = mm;
+
+  // Set ranges
+  if ( maxRain < 12.7 )
+    maxRain = 12.7;
+  float midTemp = (minTemp + maxTemp) * 0.5;
+  float tempRng = maxTemp - minTemp;
+  if ( tempRng < 10.0 )
+    tempRng = 10.0;
+  QString minTempS = QString::number( minTemp );
+  QString maxTempS = QString::number( maxTemp );
+  minTemp = midTemp - tempRng * 0.5;
+  // maxTemp = midTemp + tempRng * 0.5;
+
+  int w = SCREEN_WIDTH  * 4;
+  int h = SCREEN_HEIGHT * 4;
+  QImage im = QImage(w,h,QImage::Format_RGB32);
+  im.fill(Qt::black);
+
+  float tRain;
+  int i = 0;
+  int x0 = 0;
+
+  QPainter p;
+  if (p.begin(&im))
+    { int lTempY = (int)(((float)h)*(temps.at(0) - minTemp)/tempRng);
+      // The now line
+      int xn = (nowI * w) / n;
+      p.setPen(QPen(QColor(64, 64, 64), 4, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
+      p.drawLine( xn, h-1, xn, 0 );
+
+      // Temperature numerics
+      p.setPen(QPen(QColor(0, 200, 0)));
+      p.setFont(QFont("Arial", 160, QFont::Bold));
+      p.drawText(im.rect(), Qt::AlignTop    | Qt::AlignLeft , QString::number(temps.at(nowI)) );
+      p.setFont(QFont("Arial",  80, QFont::Bold));
+      p.drawText(im.rect(), Qt::AlignTop    | Qt::AlignRight, maxTempS );
+      p.drawText(im.rect(), Qt::AlignBottom | Qt::AlignRight, minTempS );
+
+      foreach ( float tTemp, temps )
+        { if ( i < rains.size() )
+            tRain = rains.at( i );
+           else
+            tRain = 0.0;
+          int yRain = (int)(((float)(h-20) * tRain) / maxRain);
+          i++;
+          int x1 = (i * w) / n;
+
+          // Rain bars
+          if ( tRain > 0.0 )
+            { p.setPen(QPen(QColor(0, 192, 255, 0xC0), 1, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
+              for ( int xi = x0; xi < x1; xi++ )
+                p.drawLine( xi, h-1, xi, h-20-yRain );
+            }
+
+          // Temp line
+          int tempY = (int)(((float)h)*(tTemp - minTemp)/tempRng);
+          p.setPen(QPen(QColor(255, 127, 0), 6, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
+          p.drawLine( x0, lTempY, x1, tempY );
+          lTempY = tempY;
+          x0 = x1;
+        }
+      p.end();
+    }
+
+  pm.convertFromImage( im.scaled(SCREEN_WIDTH,SCREEN_HEIGHT,Qt::IgnoreAspectRatio,Qt::SmoothTransformation ) );
+  ui->preview->setPixmap( pm );
+  on_send_clicked();
 }

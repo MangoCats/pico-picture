@@ -54,7 +54,7 @@
     <item row="1" column="2">
      <widget class="QPushButton" name="update">
       <property name="text">
-       <string>Update</string>
+       <string>Update Now</string>
       </property>
      </widget>
     </item>
@@ -75,6 +75,26 @@
       </item>
       <item>
        <widget class="QLineEdit" name="lon"/>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Auto Update Interval</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="interval">
+        <property name="suffix">
+         <string>m</string>
+        </property>
+        <property name="minimum">
+         <number>5</number>
+        </property>
+        <property name="maximum">
+         <number>60</number>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
