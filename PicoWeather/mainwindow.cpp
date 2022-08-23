@@ -10,6 +10,7 @@
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QPainter>
+#include <cmath>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -293,10 +294,10 @@ void MainWindow::renderWeather()
     maxRain = 12.7;
   float midTemp = (minTemp + maxTemp) * 0.5;
   float tempRng = maxTemp - minTemp;
-  if ( tempRng < 10.0 )
-    tempRng = 10.0;
-  QString minTempS = QString::number( minTemp );
-  QString maxTempS = QString::number( maxTemp );
+  if ( tempRng < 20.0 )
+    tempRng = 20.0;
+  QString minTempS = QString::number( round(minTemp) );
+  QString maxTempS = QString::number( round(maxTemp) );
   minTemp = midTemp - tempRng * 0.5;
   // maxTemp = midTemp + tempRng * 0.5;
 
@@ -305,28 +306,20 @@ void MainWindow::renderWeather()
   QImage im = QImage(w,h,QImage::Format_RGB32);
   im.fill(Qt::black);
 
-  float tRain;
-  int i = 0;
-  int x0 = 0;
 
   QPainter p;
   if (p.begin(&im))
-    { int lTempY = (int)(((float)h)*(temps.at(0) - minTemp)/tempRng);
-      // The now line
+    { // The now line
       int xn = (nowI * w) / n;
-      p.setPen(QPen(QColor(64, 64, 64), 4, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
+      p.setPen(QPen(QColor(128, 128, 128), 12, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
       p.drawLine( xn, h-1, xn, 0 );
 
-      // Temperature numerics
-      p.setPen(QPen(QColor(0, 200, 0)));
-      p.setFont(QFont("Arial", 160, QFont::Bold));
-      p.drawText(im.rect(), Qt::AlignTop    | Qt::AlignLeft , QString::number(temps.at(nowI)) );
-      p.setFont(QFont("Arial",  80, QFont::Bold));
-      p.drawText(im.rect(), Qt::AlignTop    | Qt::AlignRight, maxTempS );
-      p.drawText(im.rect(), Qt::AlignBottom | Qt::AlignRight, minTempS );
-
+      float tRain;
+      int i = 0;
+      int x0 = 0;
       foreach ( float tTemp, temps )
-        { if ( i < rains.size() )
+        { (void)tTemp;
+          if ( i < rains.size() )
             tRain = rains.at( i );
            else
             tRain = 0.0;
@@ -340,7 +333,22 @@ void MainWindow::renderWeather()
               for ( int xi = x0; xi < x1; xi++ )
                 p.drawLine( xi, h-1, xi, h-20-yRain );
             }
+        }
 
+      // Temperature numerics
+      p.setPen(QPen(QColor(0, 200, 0)));
+      p.setFont(QFont("Arial", 375, QFont::Bold));
+      p.drawText(im.rect(), Qt::AlignTop    | Qt::AlignLeft , QString::number(round(temps.at(nowI))) );
+      p.setFont(QFont("Arial", 120, QFont::Bold));
+      p.drawText(im.rect(), Qt::AlignTop    | Qt::AlignRight, maxTempS );
+      p.drawText(im.rect(), Qt::AlignBottom | Qt::AlignRight, minTempS );
+
+      i = 0;
+      x0 = 0;
+      int lTempY = (int)(((float)h)*(temps.at(0) - minTemp)/tempRng);
+      foreach ( float tTemp, temps )
+        { i++;
+          int x1 = (i * w) / n;
           // Temp line
           int tempY = (int)(((float)h)*(tTemp - minTemp)/tempRng);
           p.setPen(QPen(QColor(255, 127, 0), 6, Qt::SolidLine, Qt::SquareCap, Qt::BevelJoin));
