@@ -1,12 +1,16 @@
 # pico-picture
 Display system for Raspberry Pi Pico W
 
-A desktop app (PicturePoster) translates standard image files into an http: PUT which
+PicturePoster is a desktop app which translates standard image files into an http: PUT which
 is received by the Pico W and displayed on the screen.
 
 This is a "gateway" project to any desktop app which might compose pictures from whatever
 sources (weather reports, home automation, calendar schedules, etc.) and make them appear
 on the Pico screen wherever it may be (on the directly addressable network).
+
+PicoWeather is an adaptation of PicturePoster which queries weather information from a (free)
+[MeteoMatics](https://www.meteomatics.com/en/api/available-parameters/) API interface and
+renders a weather info graphic that is PUT to the Pico screen.
 
 Performance: approximately 0.3 frames per second.  Not intended for video applications.
 
@@ -23,4 +27,3 @@ Software Development
 - [flash_nuke.uf2](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html#resetting-flash-memory) file for Pico
 - code obviously adapted from the Waveshare python example for the screen 
 - and the Pico guide for http servers
-
