@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pico Weather</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="number"] {
+            width: 200px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        input[type="number"] {
+            width: 80px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        .preview {
+            margin-top: 20px;
+            text-align: center;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .preview img {
+            max-width: 100%;
+            image-rendering: pixelated;
+            transform: scale(2);
+            transform-origin: center;
+        }
+        .credentials {
+            background-color: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .inline-inputs {
+            display: inline-block;
+        }
+        .inline-inputs input {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pico Weather</h1>
+
+        <div class="form-group">
+            <label>Lat / Lon:</label>
+            <div class="inline-inputs">
+                <input type="text" id="lat" placeholder="Latitude">
+                <input type="text" id="lon" placeholder="Longitude">
+            </div>
+            <label style="margin-left: 20px;">Interval:</label>
+            <input type="number" id="interval" min="5" max="60" value="5">
+            <span>minutes</span>
+        </div>
+
+        <div class="form-group">
+            <label>Screen Address:</label>
+            <input type="text" id="address" placeholder="192.168.1.100">
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="privacy">
+                Privacy (hide credentials)
+            </label>
+        </div>
+
+        <div class="credentials" id="credentials-section">
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" id="username" placeholder="API Username">
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="password" placeholder="API Password">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <button onclick="updateNow()">Update Now</button>
+            <button onclick="sendToDisplay()">Send to Display</button>
+            <button onclick="saveConfig()">Save Config</button>
+        </div>
+
+        <div class="status" id="status">
+            Ready
+        </div>
+
+        <div class="preview">
+            <h3>Preview</h3>
+            <div id="preview-image">
+                No image available
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load config on page load
+        window.onload = async function() {
+            await loadConfig();
+            await loadStatus();
+            await loadPreview();
+
+            // Poll status every 2 seconds
+            setInterval(loadStatus, 2000);
+        };
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+
+                document.getElementById('address').value = config.address || '';
+                document.getElementById('lat').value = config.lat || '';
+                document.getElementById('lon').value = config.lon || '';
+                document.getElementById('username').value = config.username || '';
+                document.getElementById('password').value = config.password || '';
+                document.getElementById('interval').value = config.interval || 5;
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+
+        async function saveConfig() {
+            const config = {
+                address: document.getElementById('address').value,
+                lat: document.getElementById('lat').value,
+                lon: document.getElementById('lon').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                interval: parseInt(document.getElementById('interval').value)
+            };
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                if (response.ok) {
+                    document.getElementById('status').textContent = 'Configuration saved';
+                } else {
+                    document.getElementById('status').textContent = 'Failed to save configuration';
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function updateNow() {
+            document.getElementById('status').textContent = 'Updating...';
+
+            try {
+                const response = await fetch('/api/update', { method: 'POST' });
+                const result = await response.json();
+
+                document.getElementById('status').textContent = result;
+                await loadPreview();
+            } catch (error) {
+                const errorMsg = await response.text();
+                document.getElementById('status').textContent = 'Error: ' + errorMsg;
+            }
+        }
+
+        async function sendToDisplay() {
+            document.getElementById('status').textContent = 'Sending...';
+
+            try {
+                const response = await fetch('/api/send', { method: 'POST' });
+                const result = await response.json();
+
+                document.getElementById('status').textContent = result;
+            } catch (error) {
+                const errorMsg = error.message || 'Send failed';
+                document.getElementById('status').textContent = 'Error: ' + errorMsg;
+            }
+        }
+
+        async function loadStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                document.getElementById('status').textContent = status;
+            } catch (error) {
+                // Ignore status poll errors
+            }
+        }
+
+        async function loadPreview() {
+            try {
+                const response = await fetch('/api/preview');
+                if (response.ok) {
+                    const data = await response.json();
+                    const img = document.createElement('img');
+                    img.src = 'data:image/png;base64,' + data.image;
+                    img.alt = 'Weather Preview';
+
+                    const preview = document.getElementById('preview-image');
+                    preview.innerHTML = '';
+                    preview.appendChild(img);
+                }
+            } catch (error) {
+                // Preview not available yet
+            }
+        }
+
+        // Privacy toggle
+        document.getElementById('privacy').addEventListener('change', function() {
+            const credSection = document.getElementById('credentials-section');
+            credSection.style.display = this.checked ? 'none' : 'block';
+        });
+    </script>
+</body>
+</html>

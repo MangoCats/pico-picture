@@ -2,3 +2,7 @@
 build-*
 __pycache__/
 *.pyc
+
+# Rust
+target/
+Cargo.lock
