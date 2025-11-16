@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::time::Duration;
+use std::fs;
+use std::path::Path;
 
 const SCREEN_WIDTH: u32 = 240;
 const SCREEN_HEIGHT: u32 = 135;
@@ -39,6 +41,41 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    const CONFIG_FILE: &'static str = "pico-weather-config.json";
+
+    /// Load configuration from file, or create default if not found
+    fn load() -> Self {
+        if Path::new(Self::CONFIG_FILE).exists() {
+            match fs::read_to_string(Self::CONFIG_FILE) {
+                Ok(data) => match serde_json::from_str(&data) {
+                    Ok(config) => {
+                        tracing::info!("Loaded configuration from {}", Self::CONFIG_FILE);
+                        return config;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse config file: {}", e);
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!("Failed to read config file: {}", e);
+                }
+            }
+        }
+
+        tracing::info!("Using default configuration");
+        Self::default()
+    }
+
+    /// Save configuration to file
+    fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let data = serde_json::to_string_pretty(self)?;
+        fs::write(Self::CONFIG_FILE, data)?;
+        tracing::info!("Saved configuration to {}", Self::CONFIG_FILE);
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct WeatherData {
     temps: Vec<f32>,
@@ -57,8 +94,11 @@ struct AppState {
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    // Load saved configuration
+    let config = Config::load();
+
     let state = AppState {
-        config: Arc::new(RwLock::new(Config::default())),
+        config: Arc::new(RwLock::new(config)),
         weather: Arc::new(RwLock::new(None)),
         last_image: Arc::new(RwLock::new(None)),
         status: Arc::new(RwLock::new("Ready".to_string())),
@@ -111,10 +151,20 @@ async fn get_config(State(state): State<AppState>) -> Json<Config> {
 async fn save_config(
     State(state): State<AppState>,
     Json(config): Json<Config>,
-) -> StatusCode {
+) -> Result<StatusCode, (StatusCode, String)> {
+    // Save to disk
+    if let Err(e) = config.save() {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to save config: {}", e),
+        ));
+    }
+
+    // Update in-memory config
     let mut cfg = state.config.write().await;
     *cfg = config;
-    StatusCode::OK
+
+    Ok(StatusCode::OK)
 }
 
 async fn get_status(State(state): State<AppState>) -> Json<String> {
@@ -255,14 +305,40 @@ async fn render_weather(state: AppState) -> Result<(), String> {
     let weather = state.weather.read().await;
     let weather_data = weather.as_ref().ok_or("No weather data")?;
 
+    if weather_data.temps.is_empty() {
+        return Err("No temperature data".to_string());
+    }
+
+    // Use shared rendering function
+    let img = render_weather_image(weather_data);
+
+    // Store as PNG for preview
+    let mut png_data = Vec::new();
+    {
+        let encoder = image::codecs::png::PngEncoder::new(&mut png_data);
+        encoder
+            .write_image(
+                img.as_raw(),
+                SCREEN_WIDTH,
+                SCREEN_HEIGHT,
+                image::ExtendedColorType::Rgb8,
+            )
+            .map_err(|e| format!("PNG encode error: {}", e))?;
+    }
+
+    *state.last_image.write().await = Some(png_data);
+    *state.status.write().await = "Image rendered".to_string();
+
+    Ok(())
+}
+
+/// Render weather data to an image
+/// Returns RgbImage that can be encoded as PNG or RGB565
+fn render_weather_image(weather_data: &WeatherData) -> RgbImage {
     let temps = &weather_data.temps;
     let rains = &weather_data.rains;
 
     let n = temps.len();
-    if n == 0 {
-        return Err("No temperature data".to_string());
-    }
-
     let now_i = 13.min(n - 1); // 1 hour at 5 minute intervals
 
     // Calculate ranges
@@ -277,7 +353,7 @@ async fn render_weather(state: AppState) -> Result<(), String> {
     // Create image
     let mut img: RgbImage = ImageBuffer::from_pixel(SCREEN_WIDTH, SCREEN_HEIGHT, Rgb([0, 0, 0]));
 
-    // Draw "now" line
+    // Draw "now" line (gray vertical line at current time)
     let xn = ((now_i * SCREEN_WIDTH as usize) / n) as i32;
     draw_line_segment_mut(
         &mut img,
@@ -286,7 +362,7 @@ async fn render_weather(state: AppState) -> Result<(), String> {
         Rgb([128, 128, 128]),
     );
 
-    // Draw rain bars
+    // Draw rain bars (cyan)
     for (i, &rain) in rains.iter().enumerate().take(n) {
         if rain > 0.0 {
             let x0 = (i * SCREEN_WIDTH as usize) / n;
@@ -303,45 +379,43 @@ async fn render_weather(state: AppState) -> Result<(), String> {
         }
     }
 
-    // Draw temperature line
+    // Draw temperature line (orange)
     let mut last_x = 0;
-    let mut last_y = (SCREEN_HEIGHT as f32 - 1.0 - (SCREEN_HEIGHT as f32 * (temps[0] - min_temp_range) / temp_rng)) as i32;
+    let mut last_y = (SCREEN_HEIGHT as f32 - 1.0
+        - (SCREEN_HEIGHT as f32 * (temps[0] - min_temp_range) / temp_rng)) as i32;
 
     for (i, &temp) in temps.iter().enumerate().skip(1) {
         let x = ((i * SCREEN_WIDTH as usize) / n) as i32;
-        let y = (SCREEN_HEIGHT as f32 - 1.0 - (SCREEN_HEIGHT as f32 * (temp - min_temp_range) / temp_rng)) as i32;
+        let y = (SCREEN_HEIGHT as f32 - 1.0
+            - (SCREEN_HEIGHT as f32 * (temp - min_temp_range) / temp_rng)) as i32;
 
         // Draw thick line (simulate 2px width)
-        draw_line_segment_mut(&mut img, (last_x as f32, last_y as f32), (x as f32, y as f32), Rgb([255, 127, 0]));
-        draw_line_segment_mut(&mut img, (last_x as f32, (last_y + 1) as f32), (x as f32, (y + 1) as f32), Rgb([255, 127, 0]));
+        draw_line_segment_mut(
+            &mut img,
+            (last_x as f32, last_y as f32),
+            (x as f32, y as f32),
+            Rgb([255, 127, 0]),
+        );
+        draw_line_segment_mut(
+            &mut img,
+            (last_x as f32, (last_y + 1) as f32),
+            (x as f32, (y + 1) as f32),
+            Rgb([255, 127, 0]),
+        );
 
         last_x = x;
         last_y = y;
     }
 
-    // Store as PNG for preview
-    let mut png_data = Vec::new();
-    {
-        let encoder = image::codecs::png::PngEncoder::new(&mut png_data);
-        encoder.write_image(
-            img.as_raw(),
-            SCREEN_WIDTH,
-            SCREEN_HEIGHT,
-            image::ExtendedColorType::Rgb8,
-        ).map_err(|e| format!("PNG encode error: {}", e))?;
-    }
-
-    *state.last_image.write().await = Some(png_data);
-    *state.status.write().await = "Image rendered".to_string();
-
-    Ok(())
+    img
 }
 
 fn convert_to_rgb565(img: &RgbImage) -> Vec<u8> {
-    let mut data = Vec::with_capacity((SCREEN_WIDTH * SCREEN_HEIGHT * 2) as usize);
+    let (width, height) = img.dimensions();
+    let mut data = Vec::with_capacity((width * height * 2) as usize);
 
-    for y in 0..SCREEN_HEIGHT {
-        for x in 0..SCREEN_WIDTH {
+    for y in 0..height {
+        for x in 0..width {
             let pixel = img.get_pixel(x, y);
             let r = (pixel[0] >> 3) as u16;
             let g = (pixel[1] >> 2) as u16;
@@ -371,64 +445,20 @@ async fn send_to_display(state: AppState) -> Result<String, String> {
     let weather = state.weather.read().await;
     let weather_data = weather.as_ref().ok_or("No weather data")?;
 
-    let temps = &weather_data.temps;
-    let rains = &weather_data.rains;
+    // Use shared rendering function
+    let img = render_weather_image(weather_data);
 
-    let n = temps.len();
-    let now_i = 13.min(n - 1);
-
-    let min_temp = temps.iter().cloned().fold(f32::INFINITY, f32::min);
-    let max_temp = temps.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let max_rain = rains.iter().cloned().fold(0.0f32, f32::max).max(12.7);
-
-    let mid_temp = (min_temp + max_temp) * 0.5;
-    let temp_rng = (max_temp - min_temp).max(20.0);
-    let min_temp_range = mid_temp - temp_rng * 0.5;
-
-    let mut img: RgbImage = ImageBuffer::from_pixel(SCREEN_WIDTH, SCREEN_HEIGHT, Rgb([0, 0, 0]));
-
-    // Draw "now" line
-    let xn = ((now_i * SCREEN_WIDTH as usize) / n) as i32;
-    draw_line_segment_mut(&mut img, (xn as f32, (SCREEN_HEIGHT - 1) as f32), (xn as f32, 0.0), Rgb([128, 128, 128]));
-
-    // Draw rain bars
-    for (i, &rain) in rains.iter().enumerate().take(n) {
-        if rain > 0.0 {
-            let x0 = (i * SCREEN_WIDTH as usize) / n;
-            let x1 = ((i + 1) * SCREEN_WIDTH as usize) / n;
-            let y_rain = ((SCREEN_HEIGHT as f32 - 20.0) * rain / max_rain) as u32;
-
-            for x in x0..x1 {
-                for y in (SCREEN_HEIGHT - 1 - y_rain)..(SCREEN_HEIGHT - 20) {
-                    if (x as u32) < SCREEN_WIDTH && (y as u32) < SCREEN_HEIGHT {
-                        img.put_pixel(x as u32, y as u32, Rgb([0, 192, 255]));
-                    }
-                }
-            }
-        }
-    }
-
-    // Draw temperature line
-    let mut last_x = 0;
-    let mut last_y = (SCREEN_HEIGHT as f32 - 1.0 - (SCREEN_HEIGHT as f32 * (temps[0] - min_temp_range) / temp_rng)) as i32;
-
-    for (i, &temp) in temps.iter().enumerate().skip(1) {
-        let x = ((i * SCREEN_WIDTH as usize) / n) as i32;
-        let y = (SCREEN_HEIGHT as f32 - 1.0 - (SCREEN_HEIGHT as f32 * (temp - min_temp_range) / temp_rng)) as i32;
-
-        draw_line_segment_mut(&mut img, (last_x as f32, last_y as f32), (x as f32, y as f32), Rgb([255, 127, 0]));
-        draw_line_segment_mut(&mut img, (last_x as f32, (last_y + 1) as f32), (x as f32, (y + 1) as f32), Rgb([255, 127, 0]));
-
-        last_x = x;
-        last_y = y;
-    }
-
+    // Convert to RGB565 format
     let rgb565_data = convert_to_rgb565(&img);
 
     // Send to Pico W
     let url = format!("http://{}", config.address);
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Client build failed: {}", e))?;
+
     let response = client
         .put(&url)
         .header("Content-Type", "application/octet-stream")
@@ -446,5 +476,129 @@ async fn send_to_display(state: AppState) -> Result<String, String> {
         let msg = format!("Display returned error: {}", response.status());
         *state.status.write().await = msg.clone();
         Err(msg)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test RGB565 conversion for pure red
+    #[test]
+    fn test_rgb565_red() {
+        let mut img = RgbImage::new(1, 1);
+        img.put_pixel(0, 0, Rgb([255, 0, 0])); // Pure red
+
+        let rgb565 = convert_to_rgb565(&img);
+
+        assert_eq!(rgb565.len(), 2, "RGB565 should be 2 bytes");
+        // Red: 11111 000000 00000 = 0xF800
+        // Little-endian: low byte first
+        assert_eq!(rgb565[0], 0x00); // Low byte
+        assert_eq!(rgb565[1], 0xF8); // High byte
+    }
+
+    /// Test RGB565 conversion for pure green
+    #[test]
+    fn test_rgb565_green() {
+        let mut img = RgbImage::new(1, 1);
+        img.put_pixel(0, 0, Rgb([0, 255, 0])); // Pure green
+
+        let rgb565 = convert_to_rgb565(&img);
+
+        assert_eq!(rgb565.len(), 2);
+        // Green: 00000 111111 00000 = 0x07E0
+        assert_eq!(rgb565[0], 0xE0); // Low byte
+        assert_eq!(rgb565[1], 0x07); // High byte
+    }
+
+    /// Test RGB565 conversion for pure blue
+    #[test]
+    fn test_rgb565_blue() {
+        let mut img = RgbImage::new(1, 1);
+        img.put_pixel(0, 0, Rgb([0, 0, 255])); // Pure blue
+
+        let rgb565 = convert_to_rgb565(&img);
+
+        assert_eq!(rgb565.len(), 2);
+        // Blue: 00000 000000 11111 = 0x001F
+        assert_eq!(rgb565[0], 0x1F); // Low byte
+        assert_eq!(rgb565[1], 0x00); // High byte
+    }
+
+    /// Test RGB565 conversion for white
+    #[test]
+    fn test_rgb565_white() {
+        let mut img = RgbImage::new(1, 1);
+        img.put_pixel(0, 0, Rgb([255, 255, 255])); // Pure white
+
+        let rgb565 = convert_to_rgb565(&img);
+
+        assert_eq!(rgb565.len(), 2);
+        // White: 11111 111111 11111 = 0xFFFF
+        assert_eq!(rgb565[0], 0xFF); // Low byte
+        assert_eq!(rgb565[1], 0xFF); // High byte
+    }
+
+    /// Test RGB565 conversion for black
+    #[test]
+    fn test_rgb565_black() {
+        let mut img = RgbImage::new(1, 1);
+        img.put_pixel(0, 0, Rgb([0, 0, 0])); // Pure black
+
+        let rgb565 = convert_to_rgb565(&img);
+
+        assert_eq!(rgb565.len(), 2);
+        // Black: 00000 000000 00000 = 0x0000
+        assert_eq!(rgb565[0], 0x00); // Low byte
+        assert_eq!(rgb565[1], 0x00); // High byte
+    }
+
+    /// Test RGB565 conversion for orange (temperature line color)
+    #[test]
+    fn test_rgb565_orange() {
+        let mut img = RgbImage::new(1, 1);
+        img.put_pixel(0, 0, Rgb([255, 127, 0])); // Orange
+
+        let rgb565 = convert_to_rgb565(&img);
+
+        assert_eq!(rgb565.len(), 2);
+        // RGB888 to RGB565:
+        // R: 255 >> 3 = 31 (0x1F)
+        // G: 127 >> 2 = 31 (0x1F)
+        // B:   0 >> 3 =  0 (0x00)
+        // RGB565: 11111 011111 00000 = 0xFBE0
+        assert_eq!(rgb565[0], 0xE0); // Low byte
+        assert_eq!(rgb565[1], 0xFB); // High byte
+    }
+
+    /// Test RGB565 buffer size for full screen
+    #[test]
+    fn test_rgb565_buffer_size() {
+        let img = RgbImage::new(SCREEN_WIDTH, SCREEN_HEIGHT);
+        let rgb565 = convert_to_rgb565(&img);
+
+        let expected_size = (SCREEN_WIDTH * SCREEN_HEIGHT * 2) as usize;
+        assert_eq!(
+            rgb565.len(),
+            expected_size,
+            "Buffer size should be width * height * 2 bytes"
+        );
+    }
+
+    /// Test that RGB565 conversion is deterministic
+    #[test]
+    fn test_rgb565_deterministic() {
+        let mut img = RgbImage::new(10, 10);
+        for y in 0..10 {
+            for x in 0..10 {
+                img.put_pixel(x, y, Rgb([123, 45, 67]));
+            }
+        }
+
+        let data1 = convert_to_rgb565(&img);
+        let data2 = convert_to_rgb565(&img);
+
+        assert_eq!(data1, data2, "Conversion should be deterministic");
     }
 }
