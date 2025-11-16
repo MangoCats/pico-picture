@@ -5,13 +5,36 @@ from time import sleep
 import network
 import socket
 from rp2 import country
+import sys
 
+# Load configuration
+try:
+    import config
+except ImportError:
+    print("ERROR: config.py not found!")
+    print("Copy config.py.template to config.py and update with your WiFi credentials")
+    sys.exit(1)
+
+# Hardware pin configuration
 BL = 13
 DC = 8
 RST = 12
 MOSI = 11
 SCK = 10
 CS = 9
+
+# Display constants
+SCREEN_WIDTH = 240
+SCREEN_HEIGHT = 135
+BUFFER_SIZE = SCREEN_WIDTH * SCREEN_HEIGHT * 2  # RGB565 = 2 bytes per pixel
+
+# Correct RGB565 color values (5-6-5 bit format: RRRRR GGGGGG BBBBB)
+RED   = 0xF800  # 11111 000000 00000
+GREEN = 0x07E0  # 00000 111111 00000
+BLUE  = 0x001F  # 00000 000000 11111
+WHITE = 0xFFFF  # 11111 111111 11111
+BLACK = 0x0000  # 00000 000000 00000
+ORANGE = 0xFD20 # 11111 101001 00000
 
 class LCD_1inch14(framebuf.FrameBuffer):
     def __init__(self):
@@ -36,13 +59,14 @@ class LCD_1inch14(framebuf.FrameBuffer):
         self.buffer = bytearray(self.height * self.width * 2)
         super().__init__(self.buffer, self.width, self.height, framebuf.RGB565)
         self.init_display()
-        
-        self.red   =   0x07E0  # 0x00E0 looks similar
-        self.green =   0x001F  # 0x0007 looks similar
-        self.blue  =   0xF800  # 0x3800 looks similar
-        self.white =   0xFFFF
-        self.black  =  0x0000
-        self.orange =  0x07ED
+
+        # Use module-level color constants
+        self.red = RED
+        self.green = GREEN
+        self.blue = BLUE
+        self.white = WHITE
+        self.black = BLACK
+        self.orange = ORANGE
         
     def handleBacklight( self, request ):
         if len(request) > 21:
@@ -83,23 +107,45 @@ class LCD_1inch14(framebuf.FrameBuffer):
             
 # def handleGet()
 
-    def handlePut( self, request, cl ):
+    def handlePut(self, request, cl):
+        """Handle HTTP PUT request to update display image.
+
+        Expected: 64,800 bytes of RGB565 pixel data (240x135x2)
+        Format: Little-endian RGB565 (RRRRR GGGGGG BBBBB)
+        """
         print(request)
-        handleBacklight( self, request )
-        msg = "PUT " + str( len(request) )
-        self.text( msg, 20, 50, LCD.black )
-        self.show()
-        body = cl.read(64800)
+        handleBacklight(self, request)
 
-        # Direct buffer copy - much faster than pixel-by-pixel loop
-        # Client sends RGB565 data in same format as framebuffer
-        if len(body) == 64800:
+        # Read image data with size validation
+        try:
+            body = cl.read(BUFFER_SIZE)
+
+            # Validate buffer size
+            if len(body) != BUFFER_SIZE:
+                error_msg = 'HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nInvalid image size: expected {} bytes, got {}\r\n'.format(BUFFER_SIZE, len(body))
+                cl.send(error_msg)
+                cl.close()
+                print("ERROR: Invalid PUT size:", len(body))
+                return
+
+            # Direct buffer copy - fast update
             self.buffer[:] = body
+            self.show()
 
-        self.show()
+            # Success response
+            cl.send('HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK')
 
-        cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\nContent-length: 0\r\n\r\n')
-        cl.close()
+        except Exception as e:
+            print("ERROR in handlePut:", e)
+            try:
+                cl.send('HTTP/1.1 500 Internal Server Error\r\n\r\n')
+            except:
+                pass
+        finally:
+            try:
+                cl.close()
+            except:
+                pass
             
 # def handleGet()
 
@@ -118,7 +164,7 @@ class LCD_1inch14(framebuf.FrameBuffer):
         self.cs(1)
 
     def init_display(self):
-        """Initialize dispaly"""  
+        """Initialize display (ST7789 controller)"""  
         self.rst(1)
         self.rst(0)
         self.rst(1)
@@ -222,36 +268,33 @@ class LCD_1inch14(framebuf.FrameBuffer):
   
 if __name__=='__main__':
 
-# Select the onboard LED
+    # Select the onboard LED
     led = machine.Pin("LED", machine.Pin.OUT)
-    led.value(1) # LED stays on until WiFi is connected
-# Set country code, opens legal WiFi channels
-    country('US')
-    
+    led.value(1)  # LED stays on until WiFi is connected
+
+    # Set country code from config
+    wifi_country = getattr(config, 'WIFI_COUNTRY', 'US')
+    country(wifi_country)
+
+    # Initialize display
     LCD = LCD_1inch14()
-    
-#color BRG
+
+    # Draw border on startup
     LCD.fill(LCD.white)
- 
     LCD.show()
-    
-    LCD.hline( 10, 10,220,LCD.blue)
-    LCD.hline( 10,125,220,LCD.blue)
-    LCD.vline( 10, 10,115,LCD.blue)
-    LCD.vline(230, 10,115,LCD.blue)
-    
+
+    LCD.hline(10, 10, 220, LCD.blue)
+    LCD.hline(10, 125, 220, LCD.blue)
+    LCD.vline(10, 10, 115, LCD.blue)
+    LCD.vline(230, 10, 115, LCD.blue)
     LCD.show()
-    keyA = Pin(15,Pin.IN,Pin.PULL_UP)
-    keyB = Pin(17,Pin.IN,Pin.PULL_UP)
-    
-    key2 = Pin( 2,Pin.IN,Pin.PULL_UP) #上
-    key3 = Pin( 3,Pin.IN,Pin.PULL_UP) #中
-    key4 = Pin(16,Pin.IN,Pin.PULL_UP) #左
-    key5 = Pin(18,Pin.IN,Pin.PULL_UP) #下
-    key6 = Pin(20,Pin.IN,Pin.PULL_UP) #右
-    
-    ssid     = 'Imnot'
-    password = 'telling'
+
+    # Setup button for manual exit (center button)
+    key3 = Pin(3, Pin.IN, Pin.PULL_UP)
+
+    # Load WiFi credentials from config
+    ssid = config.WIFI_SSID
+    password = config.WIFI_PASSWORD
 
     print("WiFi connection starting")
     
@@ -271,54 +314,124 @@ if __name__=='__main__':
       LCD.show()
       sleep(1)
   
-# Handle connection error
+    # Handle connection error
     if wlan.status() != 3:
-      raise RuntimeError('network connection failed')
+        raise RuntimeError('WiFi connection failed')
     else:
-      status = wlan.ifconfig()
-      LCD.fill_rect( 19, 19, 211, 10, LCD.white )        
-      LCD.text( wlan.config('essid'),20,20,LCD.black )
-      LCD.text( status[0]           ,20,30,LCD.black )
-      LCD.show()
-      led.value(0)
-      
-# Open socket
-    addr = socket.getaddrinfo('0.0.0.0', 80)[0][-1]
+        status = wlan.ifconfig()
+        LCD.fill_rect(19, 19, 211, 10, LCD.white)
+        LCD.text(wlan.config('essid'), 20, 20, LCD.black)
+        LCD.text(status[0], 20, 30, LCD.black)
+        LCD.show()
+        led.value(0)
+
+    # Open HTTP server socket
+    http_port = getattr(config, 'HTTP_PORT', 80)
+    addr = socket.getaddrinfo('0.0.0.0', http_port)[0][-1]
 
     s = socket.socket()
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(addr)
     s.listen(1)
 
-    print('listening on', addr)
-    
+    print('HTTP server listening on', addr)
+
     LCD.done = False
-    while LCD.done == False:
+    error_count = 0
+    max_errors = 10
+
+    while not LCD.done:
+        cl = None
         try:
-            cl, addr = s.accept()
-            request = str( cl.recv(2048) )
-            
-            # Erase text lines 3 & 4
-            LCD.fill_rect( 19, 39, 211, 20, LCD.white )
-            LCD.text( ' '.join(map(str, addr)), 20, 40, LCD.black )
-
-            if (key3.value() == 0):
-                LCD.text( "Exit by Button Press", 20, 55, LCD.black )
+            # Check for manual exit button
+            if key3.value() == 0:
+                print("Exit by button press")
+                LCD.text("Exit by Button Press", 20, 55, LCD.black)
                 LCD.done = True
-            elif len(request) > 5:
-                if ( request[2:5] == "GET" ):
-                    LCD.handleGet( request, cl )
-                elif ( request[2:5] == "PUT" ):
-                    LCD.handlePut( request, cl )
-                
-            cl.close()
-                    
-        except OSError as e:
-            cl.close()
-            print('connection closed')
+                break
 
-    # while !done    
-    print("DONE")
-    s.close()
-    LCD.fill_rect( 12, 19, 217, 20, LCD.blue )        
+            # Accept connection with timeout
+            s.settimeout(1.0)
+            try:
+                cl, client_addr = s.accept()
+            except OSError:
+                continue  # Timeout, check exit button again
+
+            # Read request with bounds checking
+            request_bytes = cl.recv(2048)
+            if not request_bytes:
+                continue
+
+            request = str(request_bytes)
+
+            # Display client address
+            LCD.fill_rect(19, 39, 211, 20, LCD.white)
+            LCD.text(' '.join(map(str, client_addr)), 20, 40, LCD.black)
+
+            # Parse HTTP method safely
+            if len(request) > 5:
+                # Extract method from request line
+                try:
+                    # Request format: b'METHOD /path HTTP/1.1\r\n...'
+                    method_end = request.find(' ', 2)
+                    if method_end > 2:
+                        method = request[2:method_end]
+
+                        if method == "GET":
+                            LCD.handleGet(request, cl)
+                        elif method == "PUT":
+                            LCD.handlePut(request, cl)
+                        else:
+                            cl.send('HTTP/1.1 405 Method Not Allowed\r\n\r\n')
+                            cl.close()
+                except Exception as e:
+                    print("Request parse error:", e)
+                    try:
+                        cl.send('HTTP/1.1 400 Bad Request\r\n\r\n')
+                        cl.close()
+                    except:
+                        pass
+
+            # Reset error count on successful request
+            error_count = 0
+
+        except OSError as e:
+            print('Connection error:', e)
+            error_count += 1
+
+            if error_count >= max_errors:
+                print('Too many errors, restarting server...')
+                try:
+                    s.close()
+                except:
+                    pass
+
+                # Recreate socket
+                s = socket.socket()
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(addr)
+                s.listen(1)
+                error_count = 0
+
+        except Exception as e:
+            print('Unexpected error:', e)
+            error_count += 1
+
+        finally:
+            # Always close client socket
+            if cl:
+                try:
+                    cl.close()
+                except:
+                    pass
+
+    # Cleanup
+    print("Shutting down...")
+    try:
+        s.close()
+    except:
+        pass
+
+    LCD.fill_rect(12, 19, 217, 20, LCD.blue)
     LCD.show()
+    print("DONE")
