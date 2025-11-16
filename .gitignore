@@ -3,6 +3,10 @@ build-*
 __pycache__/
 *.pyc
 
+# Configuration files with secrets
+config.py
+pico-weather-config.json
+
 # Rust
 target/
 Cargo.lock

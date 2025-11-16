@@ -1,0 +1,17 @@
+# Configuration file for pico-picture
+# Copy this file to config.py and update with your values
+# DO NOT commit config.py to version control!
+
+# WiFi credentials
+WIFI_SSID = "your-wifi-ssid"
+WIFI_PASSWORD = "your-wifi-password"
+
+# Optional: Set country code for WiFi (default: 'US')
+WIFI_COUNTRY = "US"
+
+# Optional: HTTP server port (default: 80)
+HTTP_PORT = 80
+
+# Optional: API key for basic authentication (leave empty to disable)
+# If set, clients must include this in the URL: http://IP/?key=YOUR_API_KEY
+API_KEY = ""
