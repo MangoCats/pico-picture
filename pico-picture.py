@@ -90,20 +90,14 @@ class LCD_1inch14(framebuf.FrameBuffer):
         self.text( msg, 20, 50, LCD.black )
         self.show()
         body = cl.read(64800)
-        i = 1
-        y = 0
-        x = 0
-        while ( i < len(body) - 1 ):
-          c = body[i] + body[i+1] * 256
-          i += 2
-          if ( y < 135 ):
-            self.pixel( x, y, c )
-          x += 1
-          if ( x >= 240 ):
-            x = 0
-            y += 1            
+
+        # Direct buffer copy - much faster than pixel-by-pixel loop
+        # Client sends RGB565 data in same format as framebuffer
+        if len(body) == 64800:
+            self.buffer[:] = body
+
         self.show()
-              
+
         cl.send('HTTP/1.0 200 OK\r\nContent-type: text/html\r\nContent-length: 0\r\n\r\n')
         cl.close()
             
