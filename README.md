@@ -14,6 +14,10 @@ renders a weather info graphic that is PUT to the Pico screen.
 
 Performance: approximately 0.3 frames per second.  Not intended for video applications.
 
+pico-weather is a re-spin of the PicoWeather + image display server system, all-in-one
+  system implemented on the PiPico alone without a remote process.  It is using OpenMeteo 
+  (meteomatics closed their free API, OpenMeteo doesn't require an api key.)
+
 Project Bill of Materials
 
 - Raspberry Pi Pico W
