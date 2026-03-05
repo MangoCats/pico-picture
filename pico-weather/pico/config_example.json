@@ -1,0 +1,7 @@
+{
+    "ssid": "YourNetworkName",
+    "password": "YourNetworkPassword",
+    "lat": 30.27,
+    "lon": -97.74,
+    "country": "US"
+}
