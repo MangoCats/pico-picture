@@ -171,7 +171,7 @@ def test_render_triple_digits():
         "now_index": 4,
         "temp_base": 85.0,
         "temp_range": 30.0,
-        "max_precip": 12.7,
+        "max_precip": 3.175,
         "min_temp": 95.0,
         "max_temp": 108.0,
         "current_temp": 103.0,

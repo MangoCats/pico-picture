@@ -93,8 +93,9 @@ def compute_ranges(weather_data):
     max_precip = max(precips) if precips else 0.0
 
     # Enforce minimum ranges (matching existing Qt behavior)
-    if max_precip < 12.7:
-        max_precip = 12.7
+    # 3.175 = 12.7mm/hr ceiling scaled to 15-minute intervals
+    if max_precip < 3.175:
+        max_precip = 3.175
     temp_range = max_temp - min_temp
     if temp_range < 20.0:
         temp_range = 20.0

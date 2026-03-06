@@ -23,11 +23,10 @@ def color(display, r, g, b):
 
 
 def draw_aa_polyline(display, points, r, g, b, hw=0.75):
-    """Draw anti-aliased connected line segments without junction artifacts.
+    """Draw anti-aliased connected line segments.
 
-    Computes alpha for every pixel across all segments, keeps the maximum
-    alpha per pixel, then blends once. This eliminates bright dots where
-    segments meet.
+    Draws each segment directly with blend_pixel to avoid allocating a
+    large dictionary (which can exceed MicroPython's memory).
 
     Args:
         display: display object with blend_pixel(x, y, r, g, b, a) method
@@ -40,9 +39,6 @@ def draw_aa_polyline(display, points, r, g, b, hw=0.75):
     sw = SCREEN_WIDTH
     sh = SCREEN_HEIGHT
     threshold = hw + 0.5
-
-    # Accumulate max alpha per pixel across all segments
-    alphas = {}
 
     for seg in range(len(points) - 1):
         x0, y0 = points[seg]
@@ -66,9 +62,7 @@ def draw_aa_polyline(display, points, r, g, b, hw=0.75):
         if dx == 0:
             px, py = (y0, x0) if steep else (x0, y0)
             if 0 <= px < sw and 0 <= py < sh:
-                key = (px, py)
-                if key not in alphas or alphas[key] < 255:
-                    alphas[key] = 255
+                display.blend_pixel(px, py, r, g, b, 255)
             continue
 
         grad = dy / dx
@@ -93,13 +87,7 @@ def draw_aa_polyline(display, points, r, g, b, hw=0.75):
                 else:
                     px, py = x, y
                 if 0 <= px < sw and 0 <= py < sh:
-                    key = (px, py)
-                    if key not in alphas or a > alphas[key]:
-                        alphas[key] = a
-
-    # Single blend pass
-    for (px, py), a in alphas.items():
-        display.blend_pixel(px, py, r, g, b, a)
+                    display.blend_pixel(px, py, r, g, b, a)
 
 
 def render_weather(display, ranges):
@@ -184,8 +172,18 @@ def render_weather(display, ranges):
                       *COLOR_GREEN, size="large")
 
     # 3) Temperature trend line (orange, 1.5px anti-aliased, drawn last)
+    # Scale: rounded-up max at top, rounded-down min at bottom, min 20° range
+    line_top = int(max_temp) + 1 if max_temp != int(max_temp) else int(max_temp)
+    line_bot = int(min_temp) if min_temp >= 0 else int(min_temp) - 1
+    line_range = line_top - line_bot
+    if line_range < 20:
+        pad = (20 - line_range) / 2.0
+        line_top = line_top + pad
+        line_bot = line_bot - pad
+        line_range = 20
+
     def temp_to_y(temp):
-        y = int((h - 1) * (1.0 - (temp - temp_base) / temp_range))
+        y = int((h - 1) * (1.0 - (temp - line_bot) / line_range))
         if y < 0:
             y = 0
         if y >= h:
@@ -196,6 +194,6 @@ def render_weather(display, ranges):
     for i in range(1, n):
         x = (i * (w - 1)) // (n - 1) if n > 1 else 0
         points.append((x, temp_to_y(temps[i])))
-    draw_aa_polyline(display, points, *COLOR_ORANGE)
+    draw_aa_polyline(display, points, *COLOR_ORANGE, hw=1.25)
 
     display.show()

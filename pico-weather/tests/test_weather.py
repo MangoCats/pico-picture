@@ -90,8 +90,8 @@ def test_compute_ranges_dry():
     assert ranges["temp_range"] >= 20.0
     # Actual range is ~9.8, so padded range should be exactly 20
     assert abs(ranges["temp_range"] - 20.0) < 0.01
-    # Max precip should be at least 12.7 (minimum ceiling)
-    assert ranges["max_precip"] >= 12.7
+    # Max precip should be at least 3.175 (minimum ceiling for 15-min intervals)
+    assert ranges["max_precip"] >= 3.175
     # n should be 52
     assert ranges["n"] == 52
     print("PASS: test_compute_ranges_dry")
@@ -105,8 +105,8 @@ def test_compute_ranges_rainy():
     # Temp range: 53.5 to 78.8 = 25.3 degrees, should NOT be padded
     assert ranges["temp_range"] > 20.0
     assert abs(ranges["temp_range"] - (ranges["max_temp"] - ranges["min_temp"])) < 0.01
-    # Max precip is 5.10, below 12.7 ceiling
-    assert ranges["max_precip"] >= 12.7
+    # Max precip is 5.10, above 3.175 ceiling so uses actual value
+    assert abs(ranges["max_precip"] - 5.10) < 0.01
     print("PASS: test_compute_ranges_rainy")
 
 

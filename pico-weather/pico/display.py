@@ -124,16 +124,19 @@ class PicoDisplay(framebuf.FrameBuffer):
             duty = 65535
         self.pwm.duty_u16(duty)
 
+    def _read_rgb(self, offset):
+        """Read RGB888 from framebuffer at byte offset (handles byte-swap)."""
+        lo = self.buffer[offset]
+        hi = self.buffer[offset + 1]
+        # Undo byte-swap: buffer stores swapped bytes
+        val = (lo << 8) | hi
+        return (val >> 11) << 3, ((val >> 5) & 0x3F) << 2, (val & 0x1F) << 3
+
     def add_pixel(self, x, y, r, g, b):
         """Draw pixel with additive blending against existing framebuffer content."""
         if 0 <= x < self.width and 0 <= y < self.height:
             offset = (y * self.width + x) * 2
-            lo = self.buffer[offset]
-            hi = self.buffer[offset + 1]
-            val = lo | (hi << 8)
-            br = (val >> 11) << 3
-            bg = ((val >> 5) & 0x3F) << 2
-            bb = (val & 0x1F) << 3
+            br, bg, bb = self._read_rgb(offset)
             nr = min(br + r, 255)
             ng = min(bg + g, 255)
             nb = min(bb + b, 255)
@@ -148,12 +151,7 @@ class PicoDisplay(framebuf.FrameBuffer):
             if a <= 0:
                 return
             offset = (y * self.width + x) * 2
-            lo = self.buffer[offset]
-            hi = self.buffer[offset + 1]
-            val = lo | (hi << 8)
-            br = (val >> 11) << 3
-            bg = ((val >> 5) & 0x3F) << 2
-            bb = (val & 0x1F) << 3
+            br, bg, bb = self._read_rgb(offset)
             inv = 255 - a
             nr = (br * inv + r * a) // 255
             ng = (bg * inv + g * a) // 255
@@ -162,9 +160,10 @@ class PicoDisplay(framebuf.FrameBuffer):
 
     @staticmethod
     def rgb565(r, g, b):
-        """Convert RGB888 to RGB565 in framebuf byte order."""
+        """Convert RGB888 to RGB565 with byte-swap for ST7789 big-endian SPI."""
         r5 = r >> 3
         g6 = g >> 2
         b5 = b >> 3
-        p = b5 | (g6 << 5) | (r5 << 11)
-        return p
+        p = (r5 << 11) | (g6 << 5) | b5
+        # Swap bytes: framebuf stores LE uint16, ST7789 reads BE over SPI
+        return ((p & 0xFF) << 8) | (p >> 8)

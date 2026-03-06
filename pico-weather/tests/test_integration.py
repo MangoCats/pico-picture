@@ -42,7 +42,7 @@ def test_live_fetch():
     ranges = weather.compute_ranges(result)
     assert ranges is not None
     assert ranges["temp_range"] >= 20.0
-    assert ranges["max_precip"] >= 12.7
+    assert ranges["max_precip"] >= 3.175
     assert ranges["n"] == len(result["temperatures"])
 
     print(f"  Data points: {ranges['n']}")

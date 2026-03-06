@@ -3,6 +3,9 @@ build-*
 __pycache__/
 *.pyc
 
+# Pico config (contains WiFi credentials)
+pico-weather/pico/config.json
+
 # Rust
 target/
 Cargo.lock
