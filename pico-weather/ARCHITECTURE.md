@@ -6,32 +6,7 @@
 
 ## 1. System Context
 
-```
-                    +------------------+
-                    |   Open-Meteo     |
-                    |   Weather API    |
-                    |   (HTTPS/JSON)   |
-                    +--------+---------+
-                             |
-                        WiFi / Internet
-                             |
-   +-------------------------+-------------------------+
-   |              Raspberry Pi Pico W                  |
-   |                                                   |
-   |  +-------------+  +------------+  +------------+ |
-   |  |  weather.py  |->| renderer.py|->| display.py | |
-   |  |  (fetch +    |  | (draw to   |  | (SPI LCD   | |
-   |  |   parse)     |  |  buffer)   |  |  driver)   | |
-   |  +-------------+  +------------+  +------------+ |
-   |        ^                               |          |
-   |        |                          SPI bus         |
-   |  +-----+-------+                      |          |
-   |  | config.json  |          +-----------+--------+ |
-   |  | (flash fs)   |          | Waveshare LCD 1.14 | |
-   |  +--------------+          | 240x135 RGB565     | |
-   |                            +--------------------+ |
-   +---------------------------------------------------+
-```
+![System Context Diagram](docs/system_context.png)
 
 ## 2. Language and Runtime
 

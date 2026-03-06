@@ -17,64 +17,7 @@ Performance: approximately 0.3 frames per second.  Not intended for video applic
 pico-weather is a re-spin of the PicoWeather + image display server system, all-in-one
   system implemented on the PiPico alone without a remote process.  It is using OpenMeteo
   (meteomatics closed their free API, OpenMeteo doesn't require an api key.)
-
-## pico-weather Install
-
-### Prerequisites
-
-1. Flash MicroPython firmware onto your Pico W:
-   - Hold BOOTSEL while plugging in via USB
-   - Drag `rp2-pico-w-latest.uf2` onto the drive that appears
-2. Install mpremote on your PC: `pip install mpremote`
-
-### Deploy to Pico W
-
-1. Create your config file:
-   ```bash
-   cd pico-weather/pico
-   cp config_example.json config.json
-   ```
-2. Edit `config.json` with your WiFi credentials and coordinates:
-   ```json
-   {
-       "ssid": "YourNetworkName",
-       "password": "YourNetworkPassword",
-       "lat": 30.14,
-       "lon": -81.55,
-       "country": "US"
-   }
-   ```
-3. Connect Pico W via USB and copy all files:
-   ```bash
-   python -m mpremote cp main.py weather.py renderer.py fonts.py display.py wifi.py config.json :
-   ```
-4. Reset the Pico to start: `python -m mpremote reset`
-
-The device will connect to WiFi, fetch weather from Open-Meteo, and refresh every 5 minutes.
-
-### Useful mpremote commands
-
-- `python -m mpremote ls :` — list files on Pico
-- `python -m mpremote repl` — interactive REPL
-- `python -m mpremote run main.py` — run without copying
-- `python -m mpremote reset` — soft-reset
-
-### Desktop simulator
-
-Run the tkinter simulator to preview the display without hardware:
-```bash
-cd pico-weather
-pip install Pillow
-python simulator.py [lat] [lon]
-```
-
-### Tests
-
-```bash
-cd pico-weather
-pip install -r tests/requirements.txt
-python -m pytest tests/ -v
-```
+  See [pico-weather/README.md](pico-weather/README.md) for install and development instructions.
 
 Project Bill of Materials
 
